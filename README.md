@@ -1,5 +1,7 @@
 # Discriminative ensemble meta-learning with co-regularization for rare fundus diseases diagnosis
 
+[Mengdi Gao], [Hongyang Jiang], [Lei Zhu], [Zhe Jiang], [Mufeng Geng], [Qiushi Ren], [Yanye Lu]
+
 [[`Paper`](https://doi.org/10.1016/j.media.2023.102884)]
 
 > Deep neural networks (DNNs) have been widely applied in the medical image community, contributing to automatic ophthalmic screening systems for some common diseases. However, the incidence of fundus diseases patterns exhibits a typical long-tailed distribution. In clinic, a small number of common fundus diseases have sufficient observed cases for large-scale analysis while most of the fundus diseases are infrequent. For these rare diseases with extremely low-data regimes, it is challenging to train DNNs to realize automatic diagnosis. In this work, we develop an automatic diagnosis system for rare fundus diseases, based on the meta-learning framework. The system incorporates a co-regularization loss and the ensemble-learning strategy into
