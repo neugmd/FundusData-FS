@@ -12,4 +12,4 @@ We originally re-constructed a fundus images dataset, namely FundusData-FS, for 
 
 The following figure demonstrates the examples of images from each targeted fundus disease/symptom. Inside, the top row of the figure reports the preprocessed images sequentially.
 
-![pic2 alt](./pic/DataExample.png)
+![pic2 alt](./pic/DataExample_new.png)
