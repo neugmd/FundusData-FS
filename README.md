@@ -16,7 +16,7 @@ The following figure demonstrates the examples of images from each targeted fund
 
 ## Citing this paper
 
-If you use FundusData-FS dataset in your research, please use the following BibTeX entry.
+If you use FundusData-FS dataset in your research, please use the following citation.
 
 ```
 M. Gao, H. Jiang, L. Zhu et al., Discriminative ensemble meta-learning with co-regularization for rare fundus diseases diagnosis. Medical Image Analysis (2023), doi: https://doi.org/10.1016/j.media.2023.102884.
