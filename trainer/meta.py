@@ -17,6 +17,25 @@ import pdb
 from time import time
 import datetime
 
+
+class WeightScale(nn.Module):
+    def __init__(self, num=4):
+        super(WeightScale, self).__init__()
+        self.num = num
+        self.relu = nn.ReLU()
+        self.my_params = nn.Parameter(torch.ones(self.num, requires_grad=True))
+        # torch.nn.init.normal_(self.params)
+    def forward(self, x):
+        # pdb.set_trace()
+        loss = (1./(4*torch.pow(self.my_params[0],2))) * x[0] + \
+               (1./(4*torch.pow(self.my_params[1],2))) * x[1] + \
+               (1./(4*torch.pow(self.my_params[2],2))) * x[2] + \
+               (1./(4*torch.pow(self.my_params[3],2))) * x[3] + \
+               torch.log(self.my_params[0]*self.my_params[1]*self.my_params[2]*self.my_params[3])      
+        return loss  
+    def parameters(self):
+        return self.my_params
+
 class MetaTrainer(object):
     """The class that contains the code for the meta-train phase and meta-eval phase."""
     def __init__(self, args):
@@ -51,13 +70,15 @@ class MetaTrainer(object):
         
         # Build meta-transfer learning model
         self.model = MtlLearner(self.args)
+        self.weight_loss = WeightScale()
 
         # Set optimizer 
         self.optimizer = torch.optim.Adam([{'params': filter(lambda p: p.requires_grad, self.model.encoder.parameters())}, \
             {'params': self.model.base_learner_4.parameters(), 'lr': self.args.meta_lr2},\
             {'params': self.model.base_learner_43.parameters(), 'lr': self.args.meta_lr2},\
             {'params': self.model.base_learner_42.parameters(), 'lr': self.args.meta_lr2},\
-            {'params': self.model.base_learner_41.parameters(), 'lr': self.args.meta_lr2}\
+            {'params': self.model.base_learner_41.parameters(), 'lr': self.args.meta_lr2},\
+            {'params': self.weight_loss.parameters(), 'lr': self.args.meta_lr2}
             ], lr=self.args.meta_lr1)
         # Set learning rate scheduler 
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.args.step_size, gamma=self.args.gamma)        
@@ -207,8 +228,9 @@ class MetaTrainer(object):
                 loss_41 = F.cross_entropy(logits_41, label) 
                 loss_3 = F.cross_entropy(logits_3, label) 
 
-                loss = loss_4*0.7 + loss_43*0.1  + loss_42*0.1  + loss_41*0.1 + loss_3*0.05
-                
+                loss_merge = torch.cat((loss_4.reshape((1)), loss_43.reshape((1)), loss_42.reshape((1)), loss_41.reshape((1))), 0)
+                loss = self.weight_loss(loss_merge)
+
                 # Calculate meta-train accuracy
                 acc_4 = count_acc(logits_4, label)
                 acc_43 = count_acc(logits_43, label)
@@ -250,7 +272,6 @@ class MetaTrainer(object):
             self.model.eval()
 
             # Set averager classes to record validation losses and accuracies
-            val_loss_averager = Averager()
             val_acc4_averager = Averager()
             val_acc43_averager = Averager()
             val_acc42_averager = Averager()
@@ -291,15 +312,12 @@ class MetaTrainer(object):
                 loss_41 = F.cross_entropy(logits_41, label)
                 loss_3 = F.cross_entropy(logits_3, label)
                 
-                loss = loss_4*0.7 + loss_43*0.1  + loss_42*0.1  + loss_41*0.1 + loss_3*0.05
-
                 acc_4 = count_acc(logits_4, label)
                 acc_43 = count_acc(logits_43, label)
                 acc_42 = count_acc(logits_42, label)
                 acc_41 = count_acc(logits_41, label)
                 acc_3 = count_acc(logits_3, label)
 
-                val_loss_averager.add(loss.item())
                 val_acc4_averager.add(acc_4)
                 val_acc43_averager.add(acc_43)
                 val_acc42_averager.add(acc_42)
@@ -307,7 +325,6 @@ class MetaTrainer(object):
                 val_acc3_averager.add(acc_3)
 
             # Update validation averagers
-            val_loss_averager = val_loss_averager.item()
             val_acc4_averager = val_acc4_averager.item()
             val_acc43_averager = val_acc43_averager.item()
             val_acc42_averager = val_acc42_averager.item()
@@ -315,7 +332,6 @@ class MetaTrainer(object):
             val_acc3_averager = val_acc3_averager.item()
             
             # Write the tensorboardX records
-            writer.add_scalar('data/val_loss', float(val_loss_averager), epoch)
             writer.add_scalar('data/val_acc4', float(val_acc4_averager), epoch)
             writer.add_scalar('data/val_acc43', float(val_acc43_averager), epoch)
             writer.add_scalar('data/val_acc42', float(val_acc42_averager), epoch)
@@ -324,7 +340,6 @@ class MetaTrainer(object):
             
             # Save result to excel
             sheet.write(epoch+1,0,epoch)
-            sheet.write(epoch+1,1,loss.item())
             sheet.write(epoch+1,2,acc_4)
             sheet.write(epoch+1,3,acc_43)
             sheet.write(epoch+1,4,acc_42)
@@ -332,7 +347,7 @@ class MetaTrainer(object):
             sheet.write(epoch+1,6,acc_3)
             book.save(r'./meta_acc_loss.xls')
             
-            print('Epoch {}, Val, Loss={:.4f} Acc4={:.4f} Acc43={:.4f} Acc42={:.4f} Acc41={:.4f} Acc3={:.4f}'.format(epoch, val_loss_averager, val_acc4_averager, val_acc43_averager, val_acc42_averager, val_acc41_averager, val_acc3_averager))
+            # print('Epoch {}, Val, Loss={:.4f} Acc4={:.4f} Acc43={:.4f} Acc42={:.4f} Acc41={:.4f} Acc3={:.4f}'.format(epoch, val_loss_averager, val_acc4_averager, val_acc43_averager, val_acc42_averager, val_acc41_averager, val_acc3_averager))
 
             # Update best saved model
             val_list = [val_acc4_averager, val_acc43_averager, val_acc42_averager, val_acc41_averager]
@@ -351,7 +366,6 @@ class MetaTrainer(object):
             trlog['train_acc43'].append(train_acc43_averager)
             trlog['train_acc42'].append(train_acc42_averager)
             trlog['train_acc41'].append(train_acc41_averager)
-            trlog['val_loss'].append(val_loss_averager)
             trlog['val_acc4'].append(val_acc4_averager)
             trlog['val_acc43'].append(val_acc43_averager)
             trlog['val_acc42'].append(val_acc42_averager)
@@ -381,7 +395,6 @@ class MetaTrainer(object):
         test_acc_record42 = np.zeros((N_test,))
         test_acc_record41 = np.zeros((N_test,))
         test_acc_record_ave = np.zeros((N_test,))
-        test_acc_record_weight = np.zeros((N_test,))
         test_acc_record_vote = np.zeros((N_test,))
         test_acc_record_merge = np.zeros((N_test,))
 
@@ -399,7 +412,6 @@ class MetaTrainer(object):
         ave_acc42 = Averager()
         ave_acc41 = Averager()
         ave_acc_ave = Averager()
-        ave_acc_weight = Averager()
         ave_acc_vote = Averager()
         ave_acc_merge = Averager()
 
@@ -456,9 +468,6 @@ class MetaTrainer(object):
             logits_4, logits_43, logits_42, logits_41, logits_3, logits_merge = self.model((data_shot, label_shot, data_query))
             
             logits_ave = 0.25*(logits_4 + logits_43 + logits_42 + logits_41)
-            
-            #logits_weight = 0.27 * logits_4 + 0.245 * logits_43 + 0.26 * logits_42 + 0.225 * logits_41
-            logits_weight = 0.7 * logits_4 + 0.15 * logits_43 + 0.1 * logits_42 + 0.05 * logits_41
 
             # acc = count_acc(logits, label)
             acc4 = count_acc(logits_4, label)
@@ -466,7 +475,6 @@ class MetaTrainer(object):
             acc42 = count_acc(logits_42, label)
             acc41 = count_acc(logits_41, label)
             acc_ave = count_acc(logits_ave, label)
-            acc_weight = count_acc(logits_weight, label)
             acc_merge = count_acc(logits_merge, label)            
             
             ave_acc.add(acc4)
@@ -474,7 +482,6 @@ class MetaTrainer(object):
             ave_acc42.add(acc42)
             ave_acc41.add(acc41)
             ave_acc_ave.add(acc_ave)
-            ave_acc_weight.add(acc_weight)
             ave_acc_merge.add(acc_merge)
             logits_numpy_4 = F.softmax(logits_4, dim=1).data.cpu().numpy()
             logits_numpy_43 = F.softmax(logits_43, dim=1).data.cpu().numpy()
@@ -538,9 +545,7 @@ class MetaTrainer(object):
             test_acc_record43[i-1] = acc43
             test_acc_record42[i-1] = acc42
             test_acc_record41[i-1] = acc41
-            #test_acc_record42[i-1] = acc42
             test_acc_record_ave[i-1] = acc_ave
-            test_acc_record_weight[i-1] = acc_weight
             test_acc_record_vote[i-1] = acc_voting
             test_acc_record_merge[i-1] = acc_merge
             '''
@@ -558,7 +563,6 @@ class MetaTrainer(object):
         m42, pm42 = compute_confidence_interval(test_acc_record42)
         m41, pm41 = compute_confidence_interval(test_acc_record41)
         m_ave, pm_ave = compute_confidence_interval(test_acc_record_ave)
-        m_weight, pm_weight = compute_confidence_interval(test_acc_record_weight)
         m_vote, pm_vote = compute_confidence_interval(test_acc_record_vote)
         m_merge, pm_merge = compute_confidence_interval(test_acc_record_merge)
         
@@ -568,7 +572,6 @@ class MetaTrainer(object):
         print('Test Acc42 {:.4f} + {:.4f}'.format(m42, pm42))
         print('Test Acc41 {:.4f} + {:.4f}'.format(m41, pm41))
         print('Test Acc_ave {:.4f} + {:.4f}'.format(m_ave, pm_ave))
-        print('Test Acc_weight {:.4f} + {:.4f}'.format(m_weight, pm_weight))
         print('Test Acc_vote {:.4f} + {:.4f}'.format(m_vote, pm_vote))
         print('Test Acc_merge {:.4f} + {:.4f}'.format(m_merge, pm_merge))
         
